@@ -1,7 +1,7 @@
 import json
 import csv
 import os
-from typing import Union
+from typing import Union, TypeVar, Callable, Any
 import requests
 from datetime import datetime
 import zoneinfo
@@ -97,7 +97,9 @@ def main() -> None:
     #     get_time_of_city(key)
 
 
-def load_data(filename: str, build_func) -> dict[str, dict[str, float]]:
+def load_data(
+    filename: str, build_func: Callable[[], Any]
+) -> dict[str, dict[str, float]]:
     if os.path.isfile(filename):
         with open(filename, "r") as f:
             return json.load(f)
@@ -119,7 +121,7 @@ def calculate_distances(airports: dict) -> dict:
             airport_data.get("longitude_deg"),
         )
 
-        if not airport_data or not longitude:
+        if not latitude or not longitude:
             raise ValueError(f"[-] Unable fetch GPS data for {airport}")
 
         airport_coords.append((icao, latitude, longitude))
@@ -176,7 +178,9 @@ def calculate_total_reachable_airport_populations(
     # TODO: FILTER for reachable using distances and time
     populations_counter: float = 0.0
     for dest_airport_name, dest_airport_distance in distances.items():
-        if dest_airport_distance.get(source_airport_name, 0) > 150:
+        if distances[source_airport_name].get(
+            dest_airport_name, 0
+        ):  # if lower than 150 then -1, and don't include source_airport_name
             populations_counter += ICAO_TO_METRO_POPULATION[dest_airport_name]
     print(f"[+] Total Population from {source_airport_name} : {populations_counter}")
 
@@ -202,14 +206,14 @@ def calc_number_of_flyers(
                 source_city_name,
                 airport_distances,
             )
+            daily_flyers = source_city_population * PERCENT_OF_FLYERS
+            panther_flyers = daily_flyers * MARKET_SHARE
             row: list[int] = []
             for (
                 distination_city_name,
                 destination_city_population,
             ) in ICAO_TO_METRO_POPULATION.items():
                 if source_city_name != distination_city_name:
-                    daily_flyers = source_city_population * PERCENT_OF_FLYERS
-                    panther_flyers = daily_flyers * MARKET_SHARE
                     dest_share = (
                         destination_city_population / total_reachable_population
                     )
