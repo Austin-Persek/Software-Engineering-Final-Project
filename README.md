@@ -6,8 +6,9 @@
 
 **Kanban Boards**
 
-- <https://trello.com/b/CjfwMifZ/software-engineering-sp26>
-- <https://trello.com/b/chZEFrEe/software-engineering-project-backend>  
+- Frontend : <https://trello.com/b/CjfwMifZ/software-engineering-sp26>
+- Backend : <https://trello.com/b/chZEFrEe/software-engineering-project-backend>  
+- Math : <https://trello.com/b/k11ydpSG>
 
 **Hubs Map**
 
