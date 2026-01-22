@@ -1,7 +1,8 @@
 import json
+import math
 import csv
 import os
-from typing import Union, Optional, Callable, Any
+from typing import Union, Optional, Callable, Literal, Any
 import requests
 from datetime import datetime
 import zoneinfo
@@ -15,6 +16,10 @@ PERCENT_OF_FLYERS: float = 0.005
 MARKET_SHARE: float = 0.5
 MIN_MILES: float = 150.0
 HUBS: set[str] = set()
+KNOTS_TO_FT_PER_MIN: float = 101.27
+ANGLE_OF_ASCENSION_IN_DEGREES: float = 6.00
+RATE_OF_DESCEND = 1000 / 3
+SPEED_IN_KNOTS_TO_DESCEND = 250
 
 HUBS.add("KATL")
 HUBS.add("KDFW")
@@ -102,8 +107,18 @@ def main() -> None:
 
     get_best_hub_locations()  # USE load_data instead
     taxi_times: dict[str, float] = load_data(
-        "taxi-times.json", lambda: calc_time_to_taxi()
+        "taxi-times.json", lambda: calc_time_to_taxi(airports)
     )
+
+    calc_time_to_ascend_to_target_height(250, 10_000)
+    calc_time_to_descend_to_ten_thousand(38000)
+
+
+# calc_time_to_ascend_to_target_height(250, 20_000, 10000)
+# calc_time_to_ascend_to_target_height(250, 25_000, 10000)
+# calc_time_to_ascend_to_target_height(250, 30_000, 10000)
+# calc_time_to_ascend_to_target_height(250, 35_000, 10000)
+# calc_time_to_ascend_to_target_height(250, 38_000, 10000)
 
 
 def get_best_hub_locations():
@@ -201,16 +216,12 @@ DOES NOT ACCOUNT FOR FULL GATES
 """
 
 
-def is_hub(icao: str) -> bool:
-    return False
-
-
-def calc_time_to_taxi() -> dict:
+def calc_time_to_taxi(airports_data: dict) -> dict:
     taxi_times: dict[str, float] = {}
     for current_icao, current_population in ICAO_TO_METRO_POPULATION.items():
         taxi_times[current_icao] = (
             min(13, (current_population * 0.0000075))
-            if not is_hub(current_icao)
+            if not airports_data[current_icao]["is_hub"]
             else min(
                 20,
                 15
@@ -310,6 +321,41 @@ def fetch_airports() -> dict:
         airline_data[icao] = request.json()
 
     return airline_data
+
+
+def calc_time_to_ascend_to_target_height(
+    speed_in_knots: float, target_height: float, ground_level: float = 0
+):
+    feet_per_minute: float = (
+        KNOTS_TO_FT_PER_MIN
+        * math.sin(math.radians(ANGLE_OF_ASCENSION_IN_DEGREES))
+        * speed_in_knots
+    )
+
+    time_to_ascend = (target_height - ground_level) / feet_per_minute
+    print(
+        f"Time to ascend to {target_height}ft from {ground_level}ft : {time_to_ascend} minutes"
+    )
+
+    return time_to_ascend
+
+
+"""
+Returns time in minutes converting from the 1knot = 1nm / hr
+"""
+
+
+def calc_time_to_descend_to_ten_thousand(
+    cruising_altitude: Literal[38_000, 35_000, 30_000, 25_000, 20_000],
+) -> float:
+    time_to_descend = (
+        ((cruising_altitude - 10_000) * RATE_OF_DESCEND**-1) / SPEED_IN_KNOTS_TO_DESCEND
+    ) * 60
+
+    print(
+        f"Time to descend from {cruising_altitude}ft to 10,000ft : {time_to_descend} minutes"
+    )
+    return time_to_descend
 
 
 # print(calc_number_of_flyers(1_000_000, 10_000_000, 175_000_000))
