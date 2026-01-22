@@ -84,20 +84,23 @@ ICAO_TO_METRO_POPULATION: dict[str, float] = {
 
 
 def main() -> None:
-    # airports = load_data(
-    #     "airports.json", lambda: fetch_airports(list(ICAO_TO_TIMEZONE.keys()))
-    # )
+    airports = load_data(
+        "airports.json", lambda: fetch_airports(list(ICAO_TO_TIMEZONE.keys()))
+    )
 
     # FIXME: Passing data to every calc
 
-    # distances = load_data("distances.json", lambda: calculate_distances(airports))
+    distances = load_data("distances.json", lambda: calculate_distances(airports))
 
-    # calc_number_of_flyers(distances)
+    calc_number_of_flyers(distances)
 
-    # for key in ICAO_TO_TIMEZONE.values():
-    #     get_time_of_city(key)
+    for key in ICAO_TO_TIMEZONE.values():
+        get_time_of_city(key)
 
-    get_best_hub_locations()
+    get_best_hub_locations()  # USE load_data instead
+    taxi_times: dict[str, float] = load_data(
+        "taxi-times.json", lambda: calc_time_to_taxi()
+    )
 
 
 def get_best_hub_locations():
@@ -124,9 +127,7 @@ def get_best_hub_locations():
             )
 
 
-def load_data(
-    filename: str, build_func: Callable[[], Any]
-) -> dict[str, dict[str, float]]:
+def load_data(filename: str, build_func: Callable[[], Any]) -> dict:
     if os.path.isfile(filename):
         with open(filename, "r") as f:
             return json.load(f)
@@ -186,6 +187,31 @@ def calculate_distances(airports: dict) -> dict:
 """
 Format of timezone expected : "America/New_York" | "Europe/Paris"
 """
+
+
+"""
+DOES NOT ACCOUNT FOR FULL GATES 
+"""
+
+
+def is_hub(icao: str) -> bool:
+    return False
+
+
+def calc_time_to_taxi() -> dict:
+    taxi_times: dict[str, float] = {}
+    for current_icao, current_population in ICAO_TO_METRO_POPULATION.items():
+        taxi_times[current_icao] = (
+            min(13, (current_population * 0.0000075))
+            if not is_hub(current_icao)
+            else min(
+                20,
+                15
+                if current_population <= 9_000_000
+                else ((current_population - 15) // 2) + 15,
+            )
+        )
+    return taxi_times
 
 
 def get_time_of_city(iana_time_zone: str) -> datetime:
