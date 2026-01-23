@@ -13,7 +13,7 @@ from geopy.distance import great_circle  # type: ignore
 API_TOKEN = "7c9a792f46b1b7c63b174cc811c45a6ec439e49d3ab497be5c174636b9382bc50346678f6ef0810492fa9f28ce62068c"
 
 PERCENT_OF_FLYERS: float = 0.005
-MARKET_SHARE: float = 0.5
+MARKET_SHARE: float = 0.2
 MIN_MILES: float = 150.0
 HUBS: set[str] = set()
 KNOTS_TO_FT_PER_MIN: float = 101.27
@@ -94,11 +94,13 @@ ICAO_TO_METRO_POPULATION: dict[str, float] = {
 
 
 def main() -> None:
-    airports = load_data("airports.json", fetch_and_mark_airports)
+    airports = load_data("./JSONs/airports.json", fetch_and_mark_airports)
 
     # FIXME: Passing data to every calc
 
-    distances = load_data("distances.json", lambda: calculate_distances(airports))
+    distances = load_data(
+        "./JSONs/distances.json", lambda: calculate_distances(airports)
+    )
 
     calc_number_of_flyers(distances)
 
@@ -107,7 +109,7 @@ def main() -> None:
 
     get_best_hub_locations()  # USE load_data instead
     taxi_times: dict[str, float] = load_data(
-        "taxi-times.json", lambda: calc_time_to_taxi(airports)
+        "./JSONs/taxi-times.json", lambda: calc_taxi_time(airports)
     )
 
     calc_time_to_ascend_to_target_height(250, 10_000)
@@ -123,7 +125,7 @@ def main() -> None:
 
 def get_best_hub_locations():
     counts = defaultdict(int)
-    with open("travelers.csv", "r") as f:
+    with open("./CSVs/travelers.csv", "r") as f:
         counts = defaultdict(int)
         reader = csv.DictReader(f)
         for row in reader:
@@ -133,7 +135,7 @@ def get_best_hub_locations():
                 except:
                     continue
 
-        with open("hubs.json", "w") as f:
+        with open("./JSONs/hubs.json", "w") as f:
             json.dump(
                 {
                     city_name: value
@@ -177,7 +179,7 @@ def calculate_distances(airports: dict) -> dict:
         airport_coords.append((icao, latitude, longitude))
 
     with open(
-        "distances.csv",
+        "./CSVs/distances.csv",
         "w",
     ) as f:
         # TODO: This should be exported but I'm too lazy
@@ -216,19 +218,21 @@ DOES NOT ACCOUNT FOR FULL GATES
 """
 
 
-def calc_time_to_taxi(airports_data: dict) -> dict:
+def hub_taxi_time(population: float) -> float:
+    if population <= 9_000_000:
+        return 15
+    extra = math.ceil((population - 9_000_000) / 2_000_000)
+    return min(20, 15 + extra)
+
+
+def calc_taxi_time(airports_data: dict) -> dict:
     taxi_times: dict[str, float] = {}
     for current_icao, current_population in ICAO_TO_METRO_POPULATION.items():
-        taxi_times[current_icao] = (
-            min(13, (current_population * 0.0000075))
-            if not airports_data[current_icao]["is_hub"]
-            else min(
-                20,
-                15
-                if current_population <= 9_000_000
-                else ((current_population - 15) // 2) + 15,
-            )
-        )
+        if not airports_data[current_icao]["is_hub"]:
+            taxi_times[current_icao] = min(13, current_population * 0.0000075)
+        else:
+            taxi_times[current_icao] = hub_taxi_time(current_population)
+
     return taxi_times
 
 
@@ -248,10 +252,10 @@ def calculate_total_reachable_airport_populations(
 ) -> float:
     # TODO: FILTER for reachable using distances and time
     populations_counter: float = 0.0
-    for dest_airport_name, dest_airport_distance in distances.items():
-        if distances[source_airport_name].get(
-            dest_airport_name, 0
-        ):  # if lower than 150 then -1, and don't include source_airport_name
+    for dest_airport_name, nautical_miles in distances[source_airport_name].items():
+        if source_airport_name == dest_airport_name:
+            continue
+        if nautical_miles >= MIN_MILES:
             populations_counter += ICAO_TO_METRO_POPULATION[dest_airport_name]
     print(f"[+] Total Population from {source_airport_name} : {populations_counter}")
 
@@ -263,7 +267,7 @@ def calc_number_of_flyers(
     airport_distances: dict[str, dict[str, float]],
 ):
     with open(
-        "travelers.csv",
+        "./CSVs/travelers.csv",
         "w",
     ) as f:
         writer = csv.writer(f)
@@ -306,8 +310,8 @@ def fetch_and_mark_airports() -> dict:
 
 def mark_airports_as_hubs(fetched_airports_data: dict) -> dict:
     for icao in fetched_airports_data:
+        fetched_airports_data[icao]["is_hub"] = icao in HUBS
         if icao in HUBS:
-            fetched_airports_data[icao]["is_hub"] = True
             print(f"[+] Marked {icao} as hub")
     return fetched_airports_data
 
