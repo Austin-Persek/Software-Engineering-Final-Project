@@ -8,19 +8,10 @@ from datetime import datetime
 import zoneinfo
 from collections import defaultdict
 from geopy.distance import great_circle  # type: ignore
+from geographiclib.geodesic import Geodesic
+from definitions import *
 
 # import requests
-API_TOKEN = "7c9a792f46b1b7c63b174cc811c45a6ec439e49d3ab497be5c174636b9382bc50346678f6ef0810492fa9f28ce62068c"
-
-PERCENT_OF_FLYERS: float = 0.005
-MARKET_SHARE: float = 0.2
-MIN_MILES: float = 150.0
-HUBS: set[str] = set()
-KNOTS_TO_FT_PER_MIN: float = 101.27
-ANGLE_OF_ASCENSION_IN_DEGREES: float = 6.00
-RATE_OF_DESCEND = 1000 / 3
-SPEED_IN_KNOTS_TO_DESCEND = 250
-
 HUBS.add("KATL")
 HUBS.add("KDFW")
 HUBS.add("KDEN")
@@ -326,7 +317,14 @@ def fetch_airports() -> dict:
 
     return airline_data
 
-
+# FIXME:
+def calc_flight_time(source_airport : str, dest_airport : str) -> float:
+    
+    # result = Geodesic.WGS84.Inverse(lat1, lon1, lat2, lon2)
+    # initial_bearing = result['azi1']  # Initial bearing in degrees
+    # print(f"Bearing: {initial_bearing:.3f}°")   
+    ...
+    
 def calc_time_to_ascend_to_target_height(
     speed_in_knots: float, target_height: float, ground_level: float = 0
 ):

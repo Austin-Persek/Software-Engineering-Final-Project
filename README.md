@@ -23,7 +23,7 @@ We're using the lastest interpreter python 3.14. This project uses multiple libr
 ```bash
 python3.14 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r ./src/requirements.txt
 ```
 
 **Deactivate**
