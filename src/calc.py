@@ -117,7 +117,7 @@ def main() -> None:
     for key in ICAO_TO_TIMEZONE.values():
         get_time_of_city(key)
 
-    get_best_hub_locations()  # USE load_data instead
+    get_best_hub_locations()
     taxi_times: dict[str, float] = load_data(
         "./JSONs/taxi-times.json", lambda: calc_taxi_time(airports)
     )
@@ -142,7 +142,7 @@ def get_best_hub_locations():
             for col_name, value in row.items():
                 try:
                     counts[col_name] += int(value)
-                except KeyError:
+                except ValueError:
                     continue
 
         with open("./JSONs/hubs.json", "w") as f:
@@ -203,9 +203,10 @@ def calculate_distances(airports: dict) -> dict:
                     row.append(0.00)
                     continue
 
-                miles: float = great_circle(
-                    source_airport_coords, dest_airport_coords
-                ).miles
+                miles: float = (
+                    great_circle(source_airport_coords, dest_airport_coords).miles
+                    * 0.8689758
+                )
 
                 row.append(round(miles, 5) if miles >= MIN_MILES else -1.000)
 
