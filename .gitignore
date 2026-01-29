@@ -1,1 +1,3 @@
 node_modules
+src/__pycache__/
+needed-calcs.md
