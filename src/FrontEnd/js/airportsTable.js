@@ -1,9 +1,6 @@
 // js/airportsTable.js
 
-// URL of the airports JSON file
-const DATA_URL = "http://127.0.0.1:5500/JSONs/airports.json";
-
-// ID of the div where the table will be rendered
+const DATA_URL = "http://127.0.0.1:3000/JSONs/airports.json";
 const ROOT_ID = "airports-root";
 
 // Columns to display in the table
