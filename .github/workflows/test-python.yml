@@ -1,0 +1,36 @@
+name: Test-For-Outputted-Files
+
+on:
+  pull_request:
+    branches:
+      - master
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.14]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify JSONs/ and CSVs/ contain outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+
+          jsons=(JSONs/*.json)
+          csvs=(CSVs/*.csv)
+
+          if (( ${#jsons[@]} == 0 )); then
+            echo "::error::No JSON files found in JSONs/"
+            exit 1
+          fi
+
+          if (( ${#csvs[@]} == 0 )); then
+            echo "::error::No CSV files found in CSVs/"
+            exit 1
+          fi
+
+          echo "Found ${#jsons[@]} JSON(s) and ${#csvs[@]} CSV(s) ✅"
