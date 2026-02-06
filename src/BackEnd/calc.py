@@ -55,14 +55,16 @@ class Airplane:
     def __init__(
         self,
         name: str,
-        fuel_capacity: float,
-        cruising_altitude: Literal[38_000, 35_000, 30_000, 25_000, 20_000],
-        max_speed: float,
+        fuel_capacity_gal: float,
+        cruising_altitude_ft: Literal[38_000, 35_000, 30_000, 25_000, 20_000],
+        max_speed_kt: float,
+        fuel_burn_rate_gal_hr: float,
     ):
         self.name = name
-        self.fuel_capacity = fuel_capacity
-        self.cruising_altitude = cruising_altitude
-        self.max_speed = max_speed
+        self.fuel_capacity_gal = fuel_capacity_gal
+        self.cruising_altitude_ft = cruising_altitude_ft
+        self.max_speed_kt = max_speed_kt
+        self.fuel_burn_rate_gal_hr = fuel_burn_rate_gal_hr
 
     def __str__(self):
         return self.name
@@ -100,11 +102,11 @@ def main() -> None:
     taxi_times: dict[str, float] = load_data(
         f"{JSON_ROOT}/taxi-times.json", lambda: calc_taxi_time(airports)
     )
-    temp_airplnae = Airplane("FAKE", 0, 38_000, 470)
+    temp_airplnae = Airplane("FAKE", 0, 38_000, 470, 800)
     calc_flight_times(airport_coords, taxi_times, temp_airplnae)
 
 
-def get_best_hub_locations():
+def get_best_hub_locations() -> None:
     counts = defaultdict(int)
     with open(f"{CSV_ROOT}/travelers.csv", "r") as f:
         counts = defaultdict(int)
@@ -459,8 +461,11 @@ def mark_airports_as_hubs(fetched_airports_data: dict) -> dict:
     return fetched_airports_data
 
 
-def calc_flight_cost(flight_times: dict, airplane_specs: dict) -> dict:
-    airplane_specs.get
+def calc_flight_cost_and_fuel_usage(
+    flight_times: dict, airplane_specs: Airplane
+) -> dict:
+    runway_fuel_used = airplane_specs.fuel_burn_rate
+    airplane_specs.cruising_altitude
 
 
 def calc_profits(flight_costs: dict) -> dict: ...
