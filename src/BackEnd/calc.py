@@ -45,11 +45,27 @@ from math_utils import (
     feet_to_nautical_miles as feet_to_nautical_miles,
     hours_to_minutes as hours_to_minutes,
     knots_to_ft_per_min as knots_to_ft_per_min,
-    math as math,
     minutes_for_distance as minutes_for_distance,
     minutes_to_hours as minutes_to_hours,
     nautical_miles_to_feet as nautical_miles_to_feet,
 )
+
+
+class Airplane:
+    def __init__(
+        self,
+        name: str,
+        fuel_capacity: float,
+        cruising_altitude: Literal[38_000, 35_000, 30_000, 25_000, 20_000],
+        max_speed: float,
+    ):
+        self.name = name
+        self.fuel_capacity = fuel_capacity
+        self.cruising_altitude = cruising_altitude
+        self.max_speed = max_speed
+
+    def __str__(self):
+        return self.name
 
 
 def main() -> None:
@@ -84,9 +100,8 @@ def main() -> None:
     taxi_times: dict[str, float] = load_data(
         f"{JSON_ROOT}/taxi-times.json", lambda: calc_taxi_time(airports)
     )
-    temp_airplane_specs = {"cruising_altitude": 38000, "max_speed": 470}
-
-    calc_flight_times(airport_coords, taxi_times, temp_airplane_specs)
+    temp_airplnae = Airplane("FAKE", 0, 38_000, 470)
+    calc_flight_times(airport_coords, taxi_times, temp_airplnae)
 
 
 def get_best_hub_locations():
@@ -175,23 +190,23 @@ def calc_flight_times(
                 total_time_min += TIME_TO_LIFTOFF + TIME_TO_10000FT
 
                 climb_distance_nm, climb_time_min = calc_time_and_distance_to_cruising(
-                    airplane_specs["cruising_altitude"]
+                    airplane_specs.cruising_altitude
                 )
                 total_time_min += climb_time_min
 
                 descent_dist_nm, descent_time_min = (
                     calc_time_and_distance_from_cruising(
-                        airplane_specs["cruising_altitude"]
+                        airplane_specs.cruising_altitude
                     )
                 )
 
                 accel_time_min = (
-                    airplane_specs["max_speed"] - SPEED_IN_KNOTS_AT_CRUISING
+                    airplane_specs.max_speed - SPEED_IN_KNOTS_AT_CRUISING
                 ) / ACCELERATION_RATE_AT_CRUISING
 
                 accel_dist_nm = distance_for_minutes(
                     accel_time_min,
-                    (SPEED_IN_KNOTS_AT_CRUISING + airplane_specs["max_speed"]) / 2.0,
+                    (SPEED_IN_KNOTS_AT_CRUISING + airplane_specs.max_speed) / 2.0,
                 )
 
                 remaining_distance_nm = (
@@ -202,7 +217,7 @@ def calc_flight_times(
                 )
 
                 cruise_time_min = minutes_for_distance(
-                    remaining_distance_nm, airplane_specs["max_speed"] * 0.8
+                    remaining_distance_nm, airplane_specs.max_speed * 0.8
                 )
 
                 total_time_min += accel_time_min + cruise_time_min
@@ -444,7 +459,8 @@ def mark_airports_as_hubs(fetched_airports_data: dict) -> dict:
     return fetched_airports_data
 
 
-def calc_flight_cost(flight_times: dict, airplane_specs: dict) -> dict: ...
+def calc_flight_cost(flight_times: dict, airplane_specs: dict) -> dict:
+    airplane_specs.get
 
 
 def calc_profits(flight_costs: dict) -> dict: ...
