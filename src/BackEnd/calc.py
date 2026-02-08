@@ -1,4 +1,3 @@
-# IMPORTS
 import json
 import math
 import csv
@@ -14,6 +13,8 @@ from geographiclib.geodesic import Geodesic
 from definitions import (
     ACCELERATION_RATE_AT_CRUISING as ACCELERATION_RATE_AT_CRUISING,
     AIRCRAFT_ASCEND_ANGLE_IN_DEGREES as AIRCRAFT_ASCEND_ANGLE_IN_DEGREES,
+    AIRCRAFT_MONTHLY_LEASE_COSTS as AIRCRAFT_MONTHLY_LEASE_COSTS,
+    AIRCRAFT_NAMES as AIRCRAFT_NAMES,
     ANGLE_OF_ASCENSION_IN_DEGREES as ANGLE_OF_ASCENSION_IN_DEGREES,
     API_TOKEN as API_TOKEN,
     CSV_ROOT as CSV_ROOT,
@@ -99,34 +100,48 @@ def main() -> None:
         f"{JSON_ROOT}/distances.json", lambda: calc_distances(airport_coords)
     )
 
-    calc_number_of_flyers(distances)
+    panther_flyers = load_data(
+        f"{JSON_ROOT}/panther-flyers.json",
+        lambda: calc_number_of_panther_flyers_to_airport(distances),
+    )
 
-    for key in ICAO_TO_TIMEZONE.values():
-        get_time_of_city(key)
+    current_city_times = load_data(
+        f"{JSON_ROOT}/city-current-times.json", get_time_of_cities
+    )
 
-    get_best_hub_locations()
+    hub_rankings = calc_best_hub_locations
 
     taxi_times: dict[str, float] = load_data(
         f"{JSON_ROOT}/taxi-times.json", lambda: calc_taxi_time(airports)
     )
+    PLANES_BY_NAME = {
+        Boeing_737_600.name: Boeing_737_600,
+        Boeing_737_800.name: Boeing_737_800,
+        Airbus_A220_100.name: Airbus_A220_100,
+        Airbus_A220_300.name: Airbus_A220_300,
+    }
+    flight_times_by_plane: dict[str, dict] = {}
+    costs_by_plane: dict[str, dict] = {}
 
-    Boeing_737_600_flight_times = calc_flight_times(
-        airport_coords, taxi_times, Boeing_737_600, distances
-    )
-    Boeing_737_800_flight_times = calc_flight_times(
-        airport_coords, taxi_times, Boeing_737_800, distances
-    )
-    Airbus_A220_100_flight_times = calc_flight_times(
-        airport_coords, taxi_times, Airbus_A220_100, distances
-    )
-    Airbus_A220_300_flight_times = calc_flight_times(
-        airport_coords, taxi_times, Airbus_A220_300, distances
-    )
+    for plane_name in AIRCRAFT_NAMES:
+        plane = PLANES_BY_NAME[plane_name]
 
-    calc_flight_cost_and_fuel_usage(Boeing_737_600_flight_times, Boeing_737_600)
-    calc_flight_cost_and_fuel_usage(Boeing_737_800_flight_times, Boeing_737_800)
-    calc_flight_cost_and_fuel_usage(Airbus_A220_100_flight_times, Airbus_A220_100)
-    calc_flight_cost_and_fuel_usage(Airbus_A220_300_flight_times, Airbus_A220_300)
+        flight_times_by_plane[plane_name] = load_data(
+            f"{JSON_ROOT}/flight_times/{plane_name}_flight_times.json",
+            lambda plane=plane: calc_flight_times(
+                airport_coords, taxi_times, plane, distances
+            ),
+        )
+
+    for plane_name in AIRCRAFT_NAMES:
+        plane = PLANES_BY_NAME[plane_name]
+
+        costs_by_plane[plane_name] = load_data(
+            f"{JSON_ROOT}/costs/{plane_name}_costs.json",
+            lambda plane=plane: calc_flight_cost_and_fuel_usage(
+                flight_times_by_plane[plane_name], plane
+            ),
+        )
 
 
 # DISTANCES
@@ -151,39 +166,37 @@ def calc_distances(airport_coords: dict) -> dict:
     distances_csv: dict = {}
     distances_json: dict[str, dict[str, float]] = defaultdict(dict)
 
-    with open(f"{CSV_ROOT}/distances.csv", "w") as f:
-        writer = csv.writer(f)
-        writer.writerow([""] + list(ICAO_TO_TIMEZONE.keys()))
+    header = [""] + list(ICAO_TO_TIMEZONE.keys())
+    rows: list[list[Union[float, str]]] = []
 
-        for source_airport, source_coords in airport_coords.items():
-            source_airport_coords = (
-                source_coords["latitude_deg"],
-                source_coords["longitude_deg"],
+    for source_airport, source_coords in airport_coords.items():
+        source_airport_coords = (
+            source_coords["latitude_deg"],
+            source_coords["longitude_deg"],
+        )
+        row: list[Union[float, str]] = []
+
+        for dest_airport, dest_coords in airport_coords.items():
+            dest_airport_coords = (
+                dest_coords["latitude_deg"],
+                dest_coords["longitude_deg"],
             )
-            row: list[Union[float, str]] = []
+            if source_airport == dest_airport:
+                row.append(0.00)
+                continue
 
-            for dest_airport, dest_coords in airport_coords.items():
-                dest_airport_coords = (
-                    dest_coords["latitude_deg"],
-                    dest_coords["longitude_deg"],
-                )
-                if source_airport == dest_airport:
-                    row.append(0.00)
-                    continue
+            miles: float = (
+                great_circle(source_airport_coords, dest_airport_coords).miles
+                * 0.8689758
+            )
+            value = round(miles, 5) if miles >= MIN_MILES else -1.000
+            row.append(value)
+            distances_json[source_airport][dest_airport] = value
 
-                miles: float = (
-                    great_circle(source_airport_coords, dest_airport_coords).miles
-                    * 0.8689758
-                )
-                row.append(round(miles, 5) if miles >= MIN_MILES else -1.000)
+        distances_csv[source_airport] = row
+        rows.append([source_airport] + row)
 
-                distances_json[source_airport][dest_airport] = (
-                    round(miles, 5) if miles >= MIN_MILES else -1.000
-                )
-
-            distances_csv[source_airport] = row
-            writer.writerow([source_airport] + row)
-
+    write_to_csv(f"{CSV_ROOT}/distances.csv", header, rows)
     return distances_json
 
 
@@ -222,39 +235,45 @@ def calc_total_reachable_airport_populations(
     return populations_counter
 
 
-def calc_number_of_flyers(airport_distances: dict[str, dict[str, float]]):
-    with open(f"{CSV_ROOT}/travelers.csv", "w") as f:
-        writer = csv.writer(f)
-        writer.writerow([""] + list(ICAO_TO_METRO_POPULATION.keys()))
+def calc_number_of_panther_flyers_to_airport(
+    airport_distances: dict[str, dict[str, float]],
+) -> dict[str, dict[str, int]]:
+    header = [""] + list(ICAO_TO_METRO_POPULATION.keys())
+    rows: list[list[Union[int, str]]] = []
 
-        for (
+    panther_flyers: dict[str, dict[str, int]] = {}
+
+    for source_city_name, source_city_population in ICAO_TO_METRO_POPULATION.items():
+        total_reachable_population = calc_total_reachable_airport_populations(
             source_city_name,
-            source_city_population,
-        ) in ICAO_TO_METRO_POPULATION.items():
-            total_reachable_population = calc_total_reachable_airport_populations(
-                source_city_name,
-                airport_distances,
-            )
-            daily_flyers = source_city_population * PERCENT_OF_FLYERS
-            panther_flyers = daily_flyers * MARKET_SHARE
+            airport_distances,
+        )
 
-            row: list[int] = []
-            for (
-                distination_city_name,
-                destination_city_population,
-            ) in ICAO_TO_METRO_POPULATION.items():
-                if source_city_name != distination_city_name:
-                    dest_share = (
-                        destination_city_population / total_reachable_population
-                    )
-                    row.append(round(panther_flyers * dest_share))
-                else:
-                    row.append(0)
+        daily_flyers = source_city_population * PERCENT_OF_FLYERS
+        total_panther_flyers = daily_flyers * MARKET_SHARE
 
-            writer.writerow([source_city_name] + row)
+        panther_flyers[source_city_name] = {}
+
+        row: list[int] = []
+        for dest_city_name, dest_city_population in ICAO_TO_METRO_POPULATION.items():
+            if source_city_name == dest_city_name:
+                panther_flyers[source_city_name][dest_city_name] = 0
+                row.append(0)
+                continue
+
+            dest_share = dest_city_population / total_reachable_population
+            value = round(total_panther_flyers * dest_share)
+
+            panther_flyers[source_city_name][dest_city_name] = value
+            row.append(value)
+
+        rows.append([source_city_name] + row)
+
+    write_to_csv(f"{CSV_ROOT}/travelers.csv", header, rows)
+    return panther_flyers
 
 
-def get_best_hub_locations() -> None:
+def calc_best_hub_locations() -> None:
     counts = defaultdict(int)
     with open(f"{CSV_ROOT}/travelers.csv", "r") as f:
         counts = defaultdict(int)
@@ -266,7 +285,7 @@ def get_best_hub_locations() -> None:
                 except ValueError:
                     continue
 
-        with open(f"{JSON_ROOT}/hubs.json", "w") as f:
+        with open(f"{JSON_ROOT}/hub-rankings.json", "w") as f:
             json.dump(
                 {
                     city_name: value
@@ -348,110 +367,100 @@ def calc_flight_times(
     plane = airplane_specs.name
     airport_flight_times[plane] = {}
 
-    with (
-        open(
-            f"{CSV_ROOT}/times/decimal/{airplane_specs.name}_times.csv", "w", newline=""
-        ) as f_min,
-        open(
-            f"{CSV_ROOT}/times/human/{airplane_specs.name}_human_times.csv",
-            "w",
-            newline="",
-        ) as f_hms,
-    ):
-        w_min = csv.writer(f_min)
-        w_hms = csv.writer(f_hms)
+    header = [""] + list(ICAO_TO_TIMEZONE.keys())
 
-        header = [""] + list(ICAO_TO_TIMEZONE.keys())
-        w_min.writerow(header)
-        w_hms.writerow(header)
+    decimal_rows: list[list[Union[str, float]]] = []
+    human_rows: list[list[Union[str, str]]] = []
 
-        for source_airport in airport_coords:
-            airport_flight_times[plane][source_airport] = {}
+    for source_airport in airport_coords:
+        airport_flight_times[plane][source_airport] = {}
 
-            row_min: list[float] = []
-            row_hms: list[str] = []
+        row_min: list[float] = []
+        row_hms: list[str] = []
 
-            for dest_airport in airport_coords:
-                if source_airport == dest_airport:
-                    row_min.append(0.0)
-                    row_hms.append("00:00:00")
-                    airport_flight_times[plane][source_airport][dest_airport] = 0.0
-                    continue
+        for dest_airport in airport_coords:
+            if source_airport == dest_airport:
+                row_min.append(0.0)
+                row_hms.append("00:00:00")
+                airport_flight_times[plane][source_airport][dest_airport] = 0.0
+                continue
 
-                cruising_altitude: int = get_flight_cruising_altitude(
-                    source_airport, dest_airport, distances
-                )
-                total_distance_nm, initial_bearing_deg = (
-                    geodesic_distance_and_bearing_nm(
-                        airport_coords, source_airport, dest_airport
-                    )
-                )
+            cruising_altitude: int = get_flight_cruising_altitude(
+                source_airport, dest_airport, distances
+            )
+            total_distance_nm, initial_bearing_deg = geodesic_distance_and_bearing_nm(
+                airport_coords, source_airport, dest_airport
+            )
 
-                must_refuel = False  # TODO: Change
+            must_refuel = False  # TODO: Change
 
-                total_time_min: float = TURNAROUND_TIME + (
-                    REFUEL_TIME if must_refuel else 0.0
-                )
-                total_time_min += TIME_TO_LIFTOFF + TIME_TO_10000FT
+            total_time_min: float = TURNAROUND_TIME + (
+                REFUEL_TIME if must_refuel else 0.0
+            )
+            total_time_min += TIME_TO_LIFTOFF + TIME_TO_10000FT
 
-                climb_distance_nm, climb_time_min = calc_time_and_distance_to_cruising(
-                    cruising_altitude
-                )
-                total_time_min += climb_time_min
+            climb_distance_nm, climb_time_min = calc_time_and_distance_to_cruising(
+                cruising_altitude
+            )
+            total_time_min += climb_time_min
 
-                descent_dist_nm, descent_time_min = (
-                    calc_time_and_distance_from_cruising(cruising_altitude)
-                )
+            descent_dist_nm, descent_time_min = calc_time_and_distance_from_cruising(
+                cruising_altitude
+            )
 
-                accel_time_min = (
-                    airplane_specs.max_speed_kt - SPEED_IN_KNOTS_AT_CRUISING
-                ) / ACCELERATION_RATE_AT_CRUISING
+            accel_time_min = (
+                airplane_specs.max_speed_kt - SPEED_IN_KNOTS_AT_CRUISING
+            ) / ACCELERATION_RATE_AT_CRUISING
 
-                accel_dist_nm = distance_for_minutes(
-                    accel_time_min,
-                    (SPEED_IN_KNOTS_AT_CRUISING + airplane_specs.max_speed_kt) / 2.0,
-                )
+            accel_dist_nm = distance_for_minutes(
+                accel_time_min,
+                (SPEED_IN_KNOTS_AT_CRUISING + airplane_specs.max_speed_kt) / 2.0,
+            )
 
-                remaining_distance_nm = (
-                    total_distance_nm
-                    - climb_distance_nm
-                    - accel_dist_nm
-                    - descent_dist_nm
-                )
+            remaining_distance_nm = (
+                total_distance_nm - climb_distance_nm - accel_dist_nm - descent_dist_nm
+            )
 
-                cruise_time_min = minutes_for_distance(
-                    remaining_distance_nm,
-                    airplane_specs.max_speed_kt * 0.8,
-                )
+            cruise_time_min = minutes_for_distance(
+                remaining_distance_nm,
+                airplane_specs.max_speed_kt * 0.8,
+            )
 
-                total_time_min += accel_time_min + cruise_time_min
-                total_time_min += (
-                    descent_time_min + TIME_TO_STOP + taxi_times[dest_airport]
-                )
+            total_time_min += accel_time_min + cruise_time_min
+            total_time_min += descent_time_min + TIME_TO_STOP + taxi_times[dest_airport]
 
-                initial_bearing_deg %= 360.0
+            initial_bearing_deg %= 360.0
 
-                dist_from_west = abs(initial_bearing_deg - 270.0)
-                dist_from_west = min(dist_from_west, 360.0 - dist_from_west)
+            dist_from_west = abs(initial_bearing_deg - 270.0)
+            dist_from_west = min(dist_from_west, 360.0 - dist_from_west)
 
-                west_percentage = 1.0 - (dist_from_west / 90.0)
-                west_percentage = 0 if west_percentage < 0 else west_percentage
+            west_percentage = 1.0 - (dist_from_west / 90.0)
+            west_percentage = 0 if west_percentage < 0 else west_percentage
 
-                west_time_change_multiplier = 1 + (
-                    WESTBOUND_TIME_MULTIPLIER * west_percentage
-                )
-                total_time_min *= west_time_change_multiplier
+            west_time_change_multiplier = 1 + (
+                WESTBOUND_TIME_MULTIPLIER * west_percentage
+            )
+            total_time_min *= west_time_change_multiplier
 
-                total_time_min = round(total_time_min, 2)
+            total_time_min = round(total_time_min, 2)
 
-                row_min.append(total_time_min)
-                row_hms.append(minutes_to_hhmmss(total_time_min))
-                airport_flight_times[plane][source_airport][dest_airport] = (
-                    total_time_min
-                )
+            row_min.append(total_time_min)
+            row_hms.append(minutes_to_hhmmss(total_time_min))
+            airport_flight_times[plane][source_airport][dest_airport] = total_time_min
 
-            w_min.writerow([source_airport] + row_min)
-            w_hms.writerow([source_airport] + row_hms)
+        decimal_rows.append([source_airport] + row_min)
+        human_rows.append([source_airport] + row_hms)
+
+    write_to_csv(
+        f"{CSV_ROOT}/flight_times/decimal/{airplane_specs.name}_times.csv",
+        header,
+        decimal_rows,
+    )
+    write_to_csv(
+        f"{CSV_ROOT}/flight_times/human/{airplane_specs.name}_human_times.csv",
+        header,
+        human_rows,
+    )
 
     return airport_flight_times
 
@@ -460,58 +469,64 @@ def calc_flight_times(
 def calc_flight_cost_and_fuel_usage(
     flight_times_by_airplane: dict, airplane_specs: Airplane
 ) -> dict:
-    with open(f"{CSV_ROOT}/costs/{airplane_specs.name}_costs.csv", "w") as f:
-        writer = csv.writer(f)
-        writer.writerow([""] + list(ICAO_TO_METRO_POPULATION.keys()))
+    header = [""] + list(ICAO_TO_METRO_POPULATION.keys())
+    rows: list[list[Union[str, float]]] = []
 
-        flight_costs = {}
-        for source_airport in flight_times_by_airplane[airplane_specs.name]:
-            flight_costs[source_airport] = {}
+    flight_costs: dict = {}
+    for source_airport in flight_times_by_airplane[airplane_specs.name]:
+        flight_costs[source_airport] = {}
 
-            takeoff_fee = (
+        takeoff_fee = (
+            FR_TAKEOFF_LANDING_FEE_USD
+            if source_airport == "LFPG"
+            else US_TAKEOFF_LANDING_FEE_USD
+        )
+        fuel_price = FUEL_COST_FR_TO_USD if source_airport == "LFPG" else FUEL_COST_USD
+
+        row: list[float] = []
+        for dest_airport in flight_times_by_airplane[airplane_specs.name][
+            source_airport
+        ]:
+            if source_airport == dest_airport:
+                flight_costs[source_airport][dest_airport] = 0.00
+                row.append(0.00)
+                continue
+
+            flight_time_hr = (
+                flight_times_by_airplane[airplane_specs.name][source_airport][
+                    dest_airport
+                ]
+                / 60.0
+            )
+
+            gallons_used = flight_time_hr * airplane_specs.fuel_burn_rate_gal_hr
+            fuel_cost = gallons_used * fuel_price
+
+            landing_fee = (
                 FR_TAKEOFF_LANDING_FEE_USD
-                if source_airport == "LFPG"
+                if dest_airport == "LFPG"
                 else US_TAKEOFF_LANDING_FEE_USD
             )
-            fuel_price = (
-                FUEL_COST_FR_TO_USD if source_airport == "LFPG" else FUEL_COST_USD
-            )
 
-            row: list[int] = []
-            for dest_airport in flight_times_by_airplane[airplane_specs.name][
-                source_airport
-            ]:
-                if source_airport == dest_airport:
-                    flight_costs[source_airport][dest_airport] = 0.00
-                    row.append(0.00)
-                    continue
+            total_cost = round(fuel_cost + takeoff_fee + landing_fee, 2)
+            flight_costs[source_airport][dest_airport] = total_cost
+            row.append(total_cost)
 
-                flight_time_hr = (
-                    flight_times_by_airplane[airplane_specs.name][source_airport][
-                        dest_airport
-                    ]
-                    / 60.0
-                )
+        rows.append([source_airport] + row)
 
-                gallons_used = flight_time_hr * airplane_specs.fuel_burn_rate_gal_hr
-                fuel_cost = gallons_used * fuel_price
-
-                landing_fee = (
-                    FR_TAKEOFF_LANDING_FEE_USD
-                    if dest_airport == "LFPG"
-                    else US_TAKEOFF_LANDING_FEE_USD
-                )
-
-                total_cost = round(fuel_cost + takeoff_fee + landing_fee, 2)
-                flight_costs[source_airport][dest_airport] = total_cost
-                row.append(total_cost)
-
-            writer.writerow([source_airport] + row)
-
+    write_to_csv(f"{CSV_ROOT}/costs/{airplane_specs.name}_costs.csv", header, rows)
     return flight_costs
 
 
 # UTILS
+def write_to_csv(filename: str, header: list, rows: list[list]) -> None:
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
 def load_data(
     filename: str,
     build_func: Callable[[], dict],
@@ -521,21 +536,30 @@ def load_data(
         with open(filename, "r") as f:
             return json.load(f)
     data: dict = build_func()
+    write_to_json(filename, data)
+    if post_processs_func is not None:
+        post_processs_func()
+    return data
+
+
+def write_to_json(filename: str, data: dict) -> None:
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w") as f:
         json.dump(data, f)
-    return data
 
 
 def minutes_to_hhmmss(total_minutes: float) -> str:
     return str(timedelta(seconds=round(total_minutes * 60)))
 
 
-def get_time_of_city(iana_time_zone: str) -> datetime:
-    local_timezone = zoneinfo.ZoneInfo(iana_time_zone)
-    local_time = datetime.now(local_timezone)
-    print(f"Time in ({iana_time_zone.split('/')[-1]}) : ", end="")
-    print(local_time.strftime("%Y-%m-%d %H:%M:%S "))
-    return local_time
+def get_time_of_cities() -> dict[str, str]:
+    city_times = {}
+    for city_name in ICAO_TO_TIMEZONE.values():
+        local_timezone = zoneinfo.ZoneInfo(city_name)
+        local_time = datetime.now(local_timezone)
+        city_times[city_name] = local_time.strftime("%Y-%m-%d %H:%M:%S ")
+    print(city_times)
+    return city_times
 
 
 # AIRPORT_DATA

@@ -58,6 +58,7 @@ AIRCRAFT_MONTHLY_LEASE_COSTS = {
     "Airbus A220-300": 228_000,
 }
 
+AIRCRAFT_NAMES = ("737-600", "737-800", "A220-100", "A220-300")
 
 ICAO_TO_TIMEZONE = {
     "KATL": "America/New_York",
