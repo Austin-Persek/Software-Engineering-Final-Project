@@ -1,14 +1,24 @@
 // js/airportsTable.js
 
 const DATA_URL = 'http://127.0.0.1:3000/JSONs/airports.json';
+const DATA_URL_2 = 'http://127.0.0.1:3000/JSONs/airplanes.json';
 
 // Columns to display in the table
-const HEADER_COLS = [
+const AIRPORT_COLS = [
 	'icao_code',
 	'is_hub',
 	'latitude_deg',
 	'longitude_deg',
 	'runways',
+];
+
+const AIRPLANE_COLS = [
+	'name',
+	'fuel_capacity_gal',
+	'max_speed_kt',
+	'fuel_burn_rate_gal_hr',
+	'max_seats',
+	'current_seats',
 ];
 
 // var mypromise = new Promise((resolve, reject) => {
@@ -39,7 +49,7 @@ const HEADER_COLS = [
 // 		console.log(error);
 // 	});
 
-async function fetchData(URL) {
+async function fetchData(URL, HEADER_COLS) {
 	try {
 		const response = await fetch(URL);
 
@@ -47,16 +57,14 @@ async function fetchData(URL) {
 			throw new Error('Error fetching data');
 		}
 		const data = await response.json();
-		generateTable(data);
+		generateTable(data, HEADER_COLS);
 		// console.log(data);
 	} catch (error) {
 		console.log(error);
-	} finally {
-		document.getElementById('airports--loading').remove();
 	}
 }
 
-function generateTable(data) {
+function generateTable(data, HEADER_COLS) {
 	var table = document.createElement('table');
 	document.body.appendChild(table);
 
@@ -76,7 +84,7 @@ function generateTable(data) {
 		HEADER_COLS.forEach(col => {
 			const td = document.createElement('td');
 
-			if (col === 'runways') {
+			if (Array.isArray(element[col])) {
 				td.textContent = element[col].length ?? '';
 			} else {
 				td.textContent = element[col] ?? '';
@@ -86,4 +94,12 @@ function generateTable(data) {
 		table.appendChild(tr);
 	});
 }
-fetchData(DATA_URL);
+const removeLoadingElement = id => {
+	document.getElementById(id).remove();
+};
+fetchData(DATA_URL, AIRPORT_COLS).finally(() => {
+	removeLoadingElement('airports--loading');
+});
+fetchData(DATA_URL_2, AIRPLANE_COLS).finally(
+	removeLoadingElement('airplanes--loading'),
+);
