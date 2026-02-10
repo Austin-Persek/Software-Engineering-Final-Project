@@ -57,16 +57,16 @@ async function fetchData(URL, HEADER_COLS) {
 			throw new Error('Error fetching data');
 		}
 		const data = await response.json();
-		generateTable(data, HEADER_COLS);
+		generateTable(data, HEADER_COLS, 'table--container');
 		// console.log(data);
 	} catch (error) {
 		console.log(error);
 	}
 }
 
-function generateTable(data, HEADER_COLS) {
+function generateTable(data, HEADER_COLS, container_class) {
 	var table = document.createElement('table');
-	document.body.appendChild(table);
+	document.querySelector(`.${container_class}`).appendChild(table);
 
 	var headerRow = document.createElement('tr');
 

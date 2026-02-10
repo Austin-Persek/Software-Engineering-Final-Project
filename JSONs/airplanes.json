@@ -1,4 +1,2 @@
-{"737-600": 
-{"name": "737-600", "fuel_capacity_gal": 6875, "max_speed_kt": 485, "fuel_burn_rate_gal_hr": 850, "max_seats": 149, "current_seats": 0}, 
-
+{"737-600": {"name": "737-600", "fuel_capacity_gal": 6875, "max_speed_kt": 485, "fuel_burn_rate_gal_hr": 850, "max_seats": 149, "current_seats": 0}, 
 "737-800": {"name": "737-800", "fuel_capacity_gal": 6875, "max_speed_kt": 485, "fuel_burn_rate_gal_hr": 1050, "max_seats": 189, "current_seats": 0}, "A220-100": {"name": "A220-100", "fuel_capacity_gal": 5700, "max_speed_kt": 470, "fuel_burn_rate_gal_hr": 700, "max_seats": 135, "current_seats": 0}, "A220-300": {"name": "A220-300", "fuel_capacity_gal": 5700, "max_speed_kt": 470, "fuel_burn_rate_gal_hr": 750, "max_seats": 160, "current_seats": 0}}

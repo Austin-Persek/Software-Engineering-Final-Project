@@ -1,5 +1,6 @@
-h1 {
-  color: red;
+.table--container {
+  display: flex;
+  align-items: start;
 }
 
 /*# sourceMappingURL=style.css.map */
