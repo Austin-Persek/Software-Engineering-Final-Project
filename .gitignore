@@ -2,3 +2,4 @@ node_modules
 src/__pycache__/
 needed-calcs.md
 softwareEngineering
+__pycache__

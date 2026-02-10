@@ -32,6 +32,8 @@ fastapi dev server.py
 
 Access docs via the `/docs` endpoint
 
+https://fastapi.tiangolo.com/tutorial/bigger-applications/
+
 **Deactivate**
 
 ```bash
