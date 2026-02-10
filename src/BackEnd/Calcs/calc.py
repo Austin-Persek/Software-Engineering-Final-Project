@@ -116,17 +116,21 @@ def main() -> None:
         f"{JSON_ROOT}/taxi-times.json", lambda: calc_taxi_time(airports)
     )
 
-    Planes = {
+    planes = {
         Boeing_737_600.name: Boeing_737_600,
         Boeing_737_800.name: Boeing_737_800,
         Airbus_A220_100.name: Airbus_A220_100,
         Airbus_A220_300.name: Airbus_A220_300,
     }
 
+    planes_json = load_data(
+        f"{JSON_ROOT}/airplanes.json", lambda: dump_planes_to_dict(planes)
+    )
+
     flight_times_by_plane: dict[str, dict] = {}
     costs_by_plane: dict[str, dict] = {}
 
-    for plane_name, plane in Planes.items():
+    for plane_name, plane in planes.items():
         flight_times_by_plane[plane_name] = load_data(
             f"{JSON_ROOT}/flight_times/{plane_name}_flight_times.json",
             lambda plane=plane: calc_flight_times(
@@ -134,8 +138,8 @@ def main() -> None:
             ),
         )
 
-    for plane_name in Planes:
-        plane = Planes[plane_name]
+    for plane_name in planes:
+        plane = planes[plane_name]
 
         costs_by_plane[plane_name] = load_data(
             f"{JSON_ROOT}/costs/{plane_name}_costs.json",
@@ -523,6 +527,13 @@ def calc_flight_cost_and_fuel_usage(
 
 
 # UTILS
+def dump_planes_to_dict(airplanes: dict):
+    airplanes_dict = {}
+    for airplane_name, airplane in airplanes.items():
+        airplanes_dict[airplane_name] = vars(airplane)
+    return airplanes_dict
+
+
 def write_to_csv(filename: str, header: list, rows: list[list]) -> None:
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w", newline="") as f:
@@ -541,7 +552,9 @@ def load_data(
         and not program_args.overwrite
         or "airports.json" in filename
     ):
-        print(f"[-] Overwriting Disabled, for file {filename.split('/')[-1]}")
+        print(
+            f"[-] Overwriting Disabled or File {filename.split('/')[-1]} Already Exists"
+        )
         with open(filename, "r") as f:
             return json.load(f)
     message = (

@@ -4,8 +4,10 @@ import os
 script_dir = os.path.dirname(os.path.realpath(__file__))
 print(script_dir)
 
-CSV_ROOT = f"{script_dir}/../../CSVs"
-JSON_ROOT = f"{script_dir}/../../JSONs"
+"../../../JSONs"
+""
+CSV_ROOT = f"{script_dir}/../../../CSVs"
+JSON_ROOT = f"{script_dir}/../../../JSONs"
 
 # == CONSTANTS ==
 API_TOKEN = "7c9a792f46b1b7c63b174cc811c45a6ec439e49d3ab497be5c174636b9382bc50346678f6ef0810492fa9f28ce62068c"  # I know we shouldn't do this

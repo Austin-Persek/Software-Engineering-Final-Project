@@ -2,3 +2,5 @@ requests==2.32.5
 geopy==2.4.1
 types-requests==2.32.4.20260107
 argparse
+fastapi[standard-no-fastapi-cloud-cli]
+pydantic

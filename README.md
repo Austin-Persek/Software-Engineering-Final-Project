@@ -21,7 +21,13 @@ We're using the lastest interpreter python 3.14. This project uses multiple libr
 ```bash
 python3.14 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r ./src/requirements.txt
+python3.14 -m pip install -r ./src/requirements.txt
+```
+
+**Start API Server**
+
+```bash
+fastapi run dev
 ```
 
 **Deactivate**
