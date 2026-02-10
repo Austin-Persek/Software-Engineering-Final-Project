@@ -1,47 +1,89 @@
 // js/airportsTable.js
 
-const DATA_URL = "http://127.0.0.1:3000/JSONs/airports.json";
-const ROOT_ID = "airports-root";
+const DATA_URL = 'http://127.0.0.1:3000/JSONs/airports.json';
 
 // Columns to display in the table
-const COLS = [
-  "ident", "name", "type", "municipality",
-  "iso_region", "iso_country", "iata_code", "icao_code",
-  "latitude_deg", "longitude_deg", "elevation_ft"
+const HEADER_COLS = [
+	'icao_code',
+	'is_hub',
+	'latitude_deg',
+	'longitude_deg',
+	'runways',
 ];
 
-// Fetch the JSON data from the server
-fetch(DATA_URL)
-  .then((r) => {
-    // Ensure the request succeeded
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-  })
-  .then((data) => {
-    // Convert the object of airports into an array
-    const rows = Object.values(data);
+// var mypromise = new Promise((resolve, reject) => {
+// 	// networking logic
+// 	var data = false;
 
-    // Get the table mount point
-    const root = document.getElementById(ROOT_ID);
-    if (!root) return;
+// 	if (data) {
+// 		resolve(data);
+// 	} else {
+// 		reject('Error 💥💥💥');
+// 	}
+// });
 
-   
-    const head = `<tr>${COLS.map(c => `<th>${c}</th>`).join("")}</tr>`;
-    const body = rows.map((a) =>
-      `<tr>${COLS.map(c => `<td>${a?.[c] ?? ""}</td>`).join("")}</tr>`
-    ).join("");
+// mypromise.then(val => {
+// 	console.log(val);
+// });
 
-    // Inject the table into the page
-    root.innerHTML = `
-      <table border="1" cellspacing="0" cellpadding="6">
-        <thead>${head}</thead>
-        <tbody>${body}</tbody>
-      </table>
-    `;
-  })
-  .catch((e) => {
-    // Display an error message if the fetch fails
-    const root = document.getElementById(ROOT_ID);
-    if (root) root.textContent = `Failed to load airports: ${e.message}`;
-    console.error(e);
-  });
+// mypromise.catch(error => {
+// 	console.log(`ERORR ${error}`);
+// });
+
+// fetch(DATA_URL)
+// 	.then(HTTPResponse => {
+// 		if (!HTTPResponse.ok) throw new Error('Error fetching data');
+// 		HTTPResponse.json().then(data => console.log(data));
+// 	})
+// 	.catch(error => {
+// 		console.log(error);
+// 	});
+
+async function fetchData(URL) {
+	try {
+		const response = await fetch(URL);
+
+		if (!response.ok) {
+			throw new Error('Error fetching data');
+		}
+		const data = await response.json();
+		generateTable(data);
+		// console.log(data);
+	} catch (error) {
+		console.log(error);
+	} finally {
+		document.getElementById('airports--loading').remove();
+	}
+}
+
+function generateTable(data) {
+	var table = document.createElement('table');
+	document.body.appendChild(table);
+
+	var headerRow = document.createElement('tr');
+
+	HEADER_COLS.forEach(colName => {
+		const th = document.createElement('th');
+		th.textContent = colName;
+		headerRow.appendChild(th);
+	});
+
+	table.appendChild(headerRow);
+
+	Object.values(data).forEach(element => {
+		const tr = document.createElement('tr');
+
+		HEADER_COLS.forEach(col => {
+			const td = document.createElement('td');
+
+			if (col === 'runways') {
+				td.textContent = element[col].length ?? '';
+			} else {
+				td.textContent = element[col] ?? '';
+			}
+			tr.appendChild(td);
+		});
+		table.appendChild(tr);
+	});
+}
+fetchData(DATA_URL);
